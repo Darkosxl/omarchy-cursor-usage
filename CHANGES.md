@@ -1,5 +1,9 @@
 # Implementation record
 
+## 0.1.2
+
+- Added Cursor's cube mark as the tab icon, with light and dark variants matching the Codex icon. The SVG path comes from the MIT-licensed LobeHub icon set.
+
 ## 0.1.1
 
 - Replaced the included-spend bar with the meters on Cursor's spending page: Cursor Models · Grok, Other Models, and Grok Bot. The $20 credit cap is no longer shown.
