@@ -1,0 +1,45 @@
+#!/bin/bash
+# Extend the stock updater with a user-owned collector, preserving its flags.
+# The existing panel timer, opening refresh and manual refresh all use this path.
+collector_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+flags=()
+only=()
+excluded=0
+args=("$@")
+while (( $# )); do
+  case "$1" in
+    --force | --limits-only) flags+=("$1") ;;
+    --except)
+      [[ $# -ge 2 ]] || exit 2
+      [[ $2 == cursor ]] && excluded=1
+      shift ;;
+    *) only+=("$1") ;;
+  esac
+  shift
+done
+
+"${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-agent-usage-update" "${args[@]}" &
+stock_pid=$!
+status=0
+wanted=0
+(( ${#only[@]} == 0 )) && wanted=1
+for agent in "${only[@]}"; do
+  [[ $agent == cursor ]] && wanted=1
+done
+
+if (( wanted && !excluded )); then
+  usage_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/agents/usage"
+  if record=$("$collector_dir/omarchy-agent-usage-cursor" "${flags[@]}") &&
+    jq -e 'type == "object" and .id == "cursor"' >/dev/null 2>&1 <<<"$record" &&
+    mkdir -p "$usage_dir" && tmp=$(mktemp "$usage_dir/.cursor.XXXXXX"); then
+    if ! { printf '%s\n' "$record" >"$tmp" && mv "$tmp" "$usage_dir/cursor.json"; }; then
+      rm -f "$tmp"
+      status=1
+    fi
+  else
+    echo "omarchy-agent-usage-update: cursor collector failed" >&2
+    status=1
+  fi
+fi
+wait "$stock_pid" || status=1
+exit "$status"

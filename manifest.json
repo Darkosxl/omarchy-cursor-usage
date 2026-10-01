@@ -1,27 +1,41 @@
 {
   "schemaVersion": 1,
-  "id": "omarchy.agents",
-  "name": "Agents",
-  "version": "1.0.0",
-  "author": "Omarchy",
+  "id": "darkosxl.agents-cursor",
+  "name": "Agents + Cursor",
+  "version": "0.1.0",
+  "author": "Darkosxl",
   "license": "MIT",
-  "description": "Claude Code, Codex, and Fireworks usage, limits, and pace in a native Omarchy bar panel.",
-  "kinds": ["bar-widget"],
+  "description": "The native Omarchy agents panel with a Cursor tab and the same refresh lifecycle.",
+  "kinds": [
+    "bar-widget"
+  ],
   "activation": "on-demand",
   "entryPoints": {
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "Agents",
-    "description": "One bar icon and one panel: rate-limit meters with pace, today, the last week, and the all-time model breakdown for every subscription.",
+    "displayName": "Agents + Cursor",
+    "description": "The native Omarchy agents panel with a Cursor tab and the same refresh lifecycle.",
     "category": "AI",
-    "aliases": ["agents", "model-usage"],
+    "aliases": [
+      "agents",
+      "model-usage"
+    ],
     "allowMultiple": false,
     "defaults": {
       "providers": {
-        "claude": { "enabled": true },
-        "codex": { "enabled": true },
-        "fireworks": { "enabled": true }
+        "claude": {
+          "enabled": true
+        },
+        "codex": {
+          "enabled": true
+        },
+        "fireworks": {
+          "enabled": true
+        },
+        "cursor": {
+          "enabled": true
+        }
       },
       "refreshIntervalSec": 900,
       "syncMode": "Off",
@@ -30,11 +44,51 @@
       "syncDeviceId": ""
     },
     "schema": [
-      { "key": "refreshIntervalSec", "type": "integer", "label": "Refresh interval (seconds)", "min": 30, "max": 3600, "step": 30, "defaultValue": 900 },
-      { "key": "syncMode", "type": "enum", "label": "Synced aggregation", "options": ["Off", "On"], "defaultValue": "Off", "description": "When On, write this machine's local usage snapshot and merge snapshots from other machines." },
-      { "key": "syncDir", "type": "path", "label": "Sync folder", "defaultValue": "", "description": "A folder synced by Syncthing, Dropbox, rsync, etc." },
-      { "key": "syncFileName", "type": "string", "label": "Snapshot file name", "defaultValue": "", "description": "Optional. Defaults to <hostname>.json. Use a different file name on each machine, such as laptop.json or desktop.json." },
-      { "key": "syncDeviceId", "type": "string", "label": "Device id", "defaultValue": "", "description": "Optional stable device name used inside synced aggregate snapshots." }
-    ]
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 30,
+        "max": 3600,
+        "step": 30,
+        "defaultValue": 900
+      },
+      {
+        "key": "syncMode",
+        "type": "enum",
+        "label": "Synced aggregation",
+        "options": [
+          "Off",
+          "On"
+        ],
+        "defaultValue": "Off",
+        "description": "When On, write this machine's local usage snapshot and merge snapshots from other machines."
+      },
+      {
+        "key": "syncDir",
+        "type": "path",
+        "label": "Sync folder",
+        "defaultValue": "",
+        "description": "A folder synced by Syncthing, Dropbox, rsync, etc."
+      },
+      {
+        "key": "syncFileName",
+        "type": "string",
+        "label": "Snapshot file name",
+        "defaultValue": "",
+        "description": "Optional. Defaults to <hostname>.json. Use a different file name on each machine, such as laptop.json or desktop.json."
+      },
+      {
+        "key": "syncDeviceId",
+        "type": "string",
+        "label": "Device id",
+        "defaultValue": "",
+        "description": "Optional stable device name used inside synced aggregate snapshots."
+      }
+    ],
+    "defaultSection": "right"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.agents"
   }
 }
