@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "darkosxl.agents-cursor",
   "name": "Agents + Cursor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Darkosxl",
   "license": "MIT",
   "description": "The native Omarchy agents panel with a Cursor tab and the same refresh lifecycle.",

@@ -1,5 +1,9 @@
 # Implementation record
 
+## 0.1.1
+
+- Replaced the included-spend bar with the meters on Cursor's spending page: Cursor Models · Grok, Other Models, and Grok Bot. The $20 credit cap is no longer shown.
+
 ## 0.1.0
 
 - Imported the native agents widget and its SVG assets from Omarchy 4.0.4 with the upstream MIT license.

@@ -15,14 +15,23 @@ spec = importlib.util.spec_from_loader(loader.name, loader)
 cursor = importlib.util.module_from_spec(spec)
 loader.exec_module(cursor)
 
-summary = {"individualUsage": {"plan": {"used": 131, "limit": 2000, "autoPercentUsed": 0.1511, "apiPercentUsed": 1.4, "totalPercentUsed": 0.2646}},
+summary = {"individualUsage": {"plan": {"used": 2000, "limit": 2000, "autoPercentUsed": 7.2, "apiPercentUsed": 3.7, "totalPercentUsed": 6.8}},
            "billingCycleEnd": "2026-10-13T08:15:23Z", "membershipType": "pro"}
 values = cursor.limits(summary)
-assert values[0]["title"] == "Included plan" and values[0]["percent"] == 131 / 2000
-assert [w["percent"] for w in values[1:]] == [0.1511 / 100, 1.4 / 100]
-for used in (0, 2000, 2500):
-    assert cursor.limits({"individualUsage": {"plan": {"used": used, "limit": 2000}}})[0]["percent"] == used / 2000
+assert [item["title"] for item in values] == [
+    "Cursor Models · Grok",
+    "Other Models",
+]
+assert [item["percent"] for item in values] == [7.2 / 100, 3.7 / 100]
+assert cursor.limits({"individualUsage": {"plan": {"autoPercentUsed": 0}}})[0]["percent"] == 0
+bot = cursor.grok_bot_limit({"usagePercent": 0, "hasNonZeroIncludedLimit": True,
+                             "currentPeriodStart": "2026-10-01T00:00:00Z"})
+assert bot["title"] == "Grok Bot" and bot["percent"] == 0 and bot["resetsAt"].startswith("2026-10-08")
+assert cursor.grok_bot_limit({"usagePercent": 0, "usesPooledEnterpriseAllowance": True}) is None
+assert cursor.grok_bot_limit({"includedLimitZero": True, "usagePercent": 0}) is None
+assert cursor.grok_bot_limit({}) is None
 for bad in (None, {}, {"individualUsage": None}, {"individualUsage": {"plan": []}},
+            {"individualUsage": {"plan": {"used": 2000, "limit": 2000}}},
             {"individualUsage": {"plan": {"apiPercentUsed": "nan"}}}):
     try:
         cursor.limits(bad if bad is not None else {})

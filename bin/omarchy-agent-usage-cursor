@@ -86,20 +86,41 @@ def limits(summary):
     if not isinstance(plan, dict):
         raise UsageError("Cursor did not return supported individual plan limits.")
     result = []
-    # Match Cursor's overall included-usage display: spend / plan allowance.
-    # totalPercentUsed is a separate model-pool metric, not this allowance.
-    allowance = number(plan.get("limit", 0))
-    if allowance > 0:
-        result.append({"label": "Monthly included usage", "title": "Included plan",
-                       "percent": number(plan.get("used")) / allowance,
-                       "resetsAt": summary.get("billingCycleEnd", "")})
-    for field, title in (("autoPercentUsed", "Auto pool"), ("apiPercentUsed", "API pool")):
+    # The spending page draws these two pools. used/limit is the $20 credit
+    # cap and is not one of those meters.
+    resets_at = summary.get("billingCycleEnd", "")
+    for field, title in (
+        ("autoPercentUsed", "Cursor Models · Grok"),
+        ("apiPercentUsed", "Other Models"),
+    ):
         if field in plan and plan[field] is not None:
             result.append({"label": title, "title": title, "percent": number(plan[field]) / 100,
-                           "resetsAt": summary.get("billingCycleEnd", "")})
+                           "resetsAt": resets_at})
     if not result:
         raise UsageError("Cursor did not return supported individual plan limits.")
     return result
+
+
+def grok_bot_limit(status):
+    # Separate weekly allowance. A missing or ineligible response omits the row.
+    if not isinstance(status, dict) or status.get("usesPooledEnterpriseAllowance") is True:
+        return None
+    if status.get("hasNonZeroIncludedLimit") is False or status.get("includedLimitZero") is True:
+        return None
+    if "usagePercent" not in status or status.get("usagePercent") is None:
+        return None
+    resets_at = str(status.get("nextResetTimestampUtc") or "")
+    if resets_at == "":
+        start = str(status.get("currentPeriodStart") or "")
+        if start:
+            try:
+                moment = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            except ValueError:
+                moment = None
+            if moment is not None:
+                resets_at = (moment + timedelta(days=7)).isoformat()
+    return {"label": "Grok Bot", "title": "Grok Bot", "percent": number(status["usagePercent"]) / 100,
+            "resetsAt": resets_at}
 
 
 def events(cookie, now):
@@ -164,6 +185,12 @@ def collect(limits_only=False, force=False):
         cookie = session_cookie()
         summary = request(cookie, "/api/usage-summary")
         record["limits"] = limits(summary)
+        try:
+            bot = grok_bot_limit(request(cookie, "/api/dashboard/get-sand-usage-status", {}))
+            if bot:
+                record["limits"].append(bot)
+        except UsageError:
+            pass
         record.update(tierLabel=str(summary.get("membershipType") or "Subscription"), ready=True,
                       usageStatusText="", authHelpText="", updatedAt=datetime.now(timezone.utc).isoformat())
         # Cursor's dashboard calls are small: even --limits-only (panel open)

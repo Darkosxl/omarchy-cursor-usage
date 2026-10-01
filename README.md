@@ -1,6 +1,6 @@
 # Agents + Cursor for Omarchy
 
-Adds **Cursor** alongside **Claude Code** and **Codex** in Omarchy's native agents panel. Shows Cursor's included-plan usage, Auto/API model pools, billing-cycle reset, tokens by day, and tokens by model.
+Adds **Cursor** alongside **Claude Code** and **Codex** in Omarchy's native agents panel. Shows the Cursor spending-page meters, billing-cycle reset, tokens by day, and tokens by model.
 
 This is an installable clone of the agents widget shipped with **Omarchy 4.0.4 (Quattro)**, not a separate dashboard. Enabling it replaces the built-in widget in its existing bar position and retains its settings. Claude, Codex and Fireworks continue using Omarchy's installed collectors.
 
@@ -33,7 +33,7 @@ To change the interval:
 omarchy bar set darkosxl.agents-cursor refreshIntervalSec 900 --json
 ```
 
-Cursor token history covers the past 30 days; the daily chart shows the last seven local calendar days. Values come from account-wide usage, including other devices, and use Omarchy's account-scope aggregation. Every panel opening fetches fresh Cursor data. Included-plan usage is spend divided by the plan allowance, matching Cursor's overall usage display; the Auto/API percentages describe separate model pools. Nonzero pool usage below 1% displays a decimal or `<0.1%`, never `0%`. A failed request preserves previously collected data and displays an error; a first-ever failure with no usable data may leave the Cursor tab hidden.
+Cursor token history covers the past 30 days; the daily chart shows the last seven local calendar days. Values come from account-wide usage, including other devices, and use Omarchy's account-scope aggregation. Every panel opening fetches fresh Cursor data. The meters use the spending-page names: **Cursor Models · Grok**, **Other Models**, and **Grok Bot**. Grok Bot is the separate weekly allowance. Nonzero usage below 1% displays a decimal or `<0.1%`, never `0%`. A failed request preserves previously collected data and displays an error; a first-ever failure with no usable data may leave the Cursor tab hidden.
 
 ## Update and remove
 
