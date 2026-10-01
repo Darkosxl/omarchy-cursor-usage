@@ -1,0 +1,179 @@
+#!/usr/bin/python3
+"""Cursor account usage in Omarchy's existing agent record format."""
+import argparse
+import base64
+import json
+import math
+import os
+import sqlite3
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+
+STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
+CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+CACHE = STATE / "omarchy/agents/usage/cursor.json"
+ORIGIN = "https://cursor.com"
+
+
+class UsageError(Exception):
+    pass
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Never forward the session credential to a redirect destination.
+        raise UsageError("Cursor redirected the usage request; sign in again in Cursor.")
+
+
+def session_cookie():
+    path = CONFIG / "Cursor/User/globalStorage/state.vscdb"
+    try:
+        with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=2) as db:
+            row = db.execute("SELECT value FROM ItemTable WHERE key = 'cursorAuth/accessToken'").fetchone()
+        token = row[0] if row else ""
+        claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "==="))
+        user = claims["sub"].split("|")[-1]
+        if not user or not token:
+            raise ValueError()
+        return urllib.parse.quote(user + "::" + token, safe="")
+    except (sqlite3.Error, OSError, ValueError, IndexError, KeyError, TypeError):
+        raise UsageError("Sign in to the Cursor desktop app to read account usage.") from None
+
+
+def request(cookie, path, body=None):
+    req = urllib.request.Request(
+        ORIGIN + path,
+        data=None if body is None else json.dumps(body).encode(),
+        headers={"Cookie": "WorkosCursorSessionToken=" + cookie,
+                 "Origin": ORIGIN, "Referer": ORIGIN + "/dashboard",
+                 "Accept": "application/json", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=15) as response:
+            payload = json.load(response)
+        if not isinstance(payload, dict):
+            raise ValueError()
+        return payload
+    except urllib.error.HTTPError as error:
+        if error.code in (401, 403):
+            raise UsageError("Cursor rejected the session. Sign in again in the Cursor desktop app.") from None
+        raise UsageError(f"Cursor usage returned HTTP {error.code}.") from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise UsageError("Could not reach Cursor. Displayed data is from the previous refresh.") from None
+    except (ValueError, TypeError):
+        raise UsageError("Cursor returned an invalid usage response.") from None
+
+
+def number(value):
+    if isinstance(value, bool):
+        raise UsageError("Cursor returned invalid usage numbers.")
+    try:
+        result = float(value)
+        if not math.isfinite(result) or result < 0:
+            raise ValueError()
+        return result
+    except (ValueError, TypeError, OverflowError):
+        raise UsageError("Cursor returned invalid usage numbers.") from None
+
+
+def limits(summary):
+    individual = summary.get("individualUsage")
+    plan = individual.get("plan") if isinstance(individual, dict) else None
+    if not isinstance(plan, dict):
+        raise UsageError("Cursor did not return supported individual plan limits.")
+    result = []
+    for field, title in (("autoPercentUsed", "Auto"), ("apiPercentUsed", "API"), ("totalPercentUsed", "Total")):
+        if field in plan and plan[field] is not None:
+            result.append({"label": title, "title": title, "percent": number(plan[field]) / 100,
+                           "resetsAt": summary.get("billingCycleEnd", "")})
+    if not result:
+        raise UsageError("Cursor did not return supported individual plan limits.")
+    return result
+
+
+def events(cookie, now):
+    rows = []
+    body = {"startDate": str(int((now - timedelta(days=30)).timestamp() * 1000)),
+            "endDate": str(int(now.timestamp() * 1000)), "pageSize": 100}
+    for page in range(1, 101):
+        payload = request(cookie, "/api/dashboard/get-filtered-usage-events", dict(body, page=page))
+        batch = payload.get("usageEventsDisplay")
+        if not isinstance(batch, list):
+            raise UsageError("Cursor did not return usage events.")
+        rows.extend(batch)
+        if len(rows) >= number(payload.get("totalUsageEventsCount")):
+            return rows
+        if not batch:
+            break
+    raise UsageError("Cursor returned incomplete usage history; previous token statistics retained.")
+
+
+def summarize(rows, today):
+    days = {(today - timedelta(days=n)).isoformat(): 0 for n in range(6, -1, -1)}
+    models, active, today_models = {}, set(), {}
+    fields = {"inputTokens": "inputTokens", "outputTokens": "outputTokens",
+              "cacheReadTokens": "cacheReadInputTokens", "cacheWriteTokens": "cacheCreationInputTokens"}
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("tokenUsage"), dict):
+            continue
+        try:
+            day = datetime.fromtimestamp(number(row["timestamp"]) / 1000).date().isoformat()
+        except (KeyError, ValueError, OverflowError, OSError):
+            raise UsageError("Cursor returned an invalid usage date.") from None
+        counts = {dest: int(number(row["tokenUsage"].get(src, 0))) for src, dest in fields.items()}
+        total = sum(counts.values())
+        if not total:
+            continue
+        model = str(row.get("model") or "unknown")
+        bucket = models.setdefault(model, dict.fromkeys(fields.values(), 0))
+        for key, value in counts.items():
+            bucket[key] += value
+        active.add(day)
+        if day in days:
+            days[day] += total
+        if day == today.isoformat():
+            today_models[model] = today_models.get(model, 0) + total
+    return {"recentDays": [{"date": day, "messageCount": count} for day, count in days.items()],
+            "modelUsage": models, "activeDays": len(active), "activeDates": sorted(active),
+            "todayTotalTokens": sum(today_models.values()), "todayTokensByModel": today_models,
+            "hasLocalStats": True}
+
+
+def collect(limits_only=False, force=False):
+    try:
+        record = json.loads(CACHE.read_text())
+        if not isinstance(record, dict) or record.get("id") != "cursor":
+            record = {}
+    except (OSError, ValueError):
+        record = {}
+    record.update(schemaVersion=1, id="cursor", name="Cursor", scope="account", hasPromptStats=False)
+    record.setdefault("limits", [])
+    record.setdefault("ready", False)
+    stats_failed = record.get("usageStatusText") == "Token usage unavailable"
+    try:
+        cookie = session_cookie()
+        summary = request(cookie, "/api/usage-summary")
+        record["limits"] = limits(summary)
+        record.update(tierLabel=str(summary.get("membershipType") or "Subscription"), ready=True,
+                      usageStatusText="", authHelpText="", updatedAt=datetime.now(timezone.utc).isoformat())
+        if force or not limits_only or not record.get("hasLocalStats") or stats_failed:
+            try:
+                now = datetime.now().astimezone()
+                record.update(summarize(events(cookie, now), now.date()))
+            except UsageError as error:
+                record.update(usageStatusText="Token usage unavailable", authHelpText=str(error))
+    except UsageError as error:
+        record.update(usageStatusText="Cursor usage unavailable", authHelpText=str(error))
+    return record
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--limits-only", action="store_true")
+    args = parser.parse_args()
+    print(json.dumps(collect(args.limits_only, args.force), separators=(",", ":")))
