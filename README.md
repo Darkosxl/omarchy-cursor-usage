@@ -1,0 +1,74 @@
+# Agents + Cursor for Omarchy
+
+Adds **Cursor** alongside **Claude Code** and **Codex** in Omarchy's native agents panel. Shows Cursor's Auto, API and total plan usage, billing-cycle reset, tokens by day, and tokens by model.
+
+This is an installable clone of the agents widget shipped with **Omarchy 4.0.4 (Quattro)**, not a separate dashboard. Enabling it replaces the built-in widget in its existing bar position and retains its settings. Claude, Codex and Fireworks continue using Omarchy's installed collectors.
+
+## Install
+
+Requires Omarchy Quattro with the agents widget, Python 3, Bash and jq (already provided by Omarchy), and a signed-in **Cursor desktop app** using an individual subscription.
+
+```sh
+omarchy plugin add https://github.com/Darkosxl/omarchy-cursor-usage --enable
+```
+
+Cursor's authentication is read from `~/.config/Cursor/User/globalStorage/state.vscdb` in read-only mode. `XDG_CONFIG_HOME` is honored. CLI-only authentication, teams and enterprise plans are not supported by this version. No API key or copied browser cookie is required.
+
+## Refresh
+
+Cursor uses exactly the existing panel refresh lifecycle:
+
+| Trigger | Behavior |
+| --- | --- |
+| Shell starts / widget loads | Collect all enabled providers |
+| Every 900 seconds by default | Refresh limits and token history |
+| Open the panel | `--limits-only`: refresh limits, reuse token statistics |
+| Press `r` or Enter in the panel | `--force`: refresh limits and token statistics |
+
+The bundled updater forwards all arguments to the installed stock updater and runs the Cursor collector alongside it. It honors `--except cursor`, explicit provider selections, and the panel's enabled-provider settings. There is no additional timer, service, global command override, or packaged Omarchy file modification.
+
+To change the interval:
+
+```sh
+omarchy bar set darkosxl.agents-cursor refreshIntervalSec 900 --json
+```
+
+Cursor token history covers the past 30 days; the daily chart shows the last seven local calendar days. Values come from account-wide usage, including other devices, and use Omarchy's account-scope aggregation. Cached token data is reused when only limits are requested. A failed request preserves previously collected data and displays an error; a first-ever failure with no usable data may leave the Cursor tab hidden.
+
+## Update and remove
+
+```sh
+omarchy plugin update darkosxl.agents-cursor
+```
+
+Removal restores the original Omarchy agents widget. Delete the generated Cursor record too, otherwise the original widget can continue displaying its last cached numbers:
+
+```sh
+omarchy plugin remove darkosxl.agents-cursor
+rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/agents/usage/cursor.json"
+omarchy-shell omarchy.agents refresh
+```
+
+Only the plugin directory and its generated usage record are removed. Cursor's app, authentication database and conversations are untouched.
+
+## Data access
+
+The collector sends the existing session credential only to `https://cursor.com`, using its dashboard's read-only usage endpoints. Redirects are refused. Credentials are neither printed nor written to the usage record. The generated record contains plan limits, dates and aggregate token counts; it contains no chat text, email address or session token.
+
+The individual dashboard endpoints are not a supported public API and can change. Invalid or unavailable responses produce a status message rather than fabricated usage. Pagination is capped at 10,000 events per refresh; beyond that the collector reports incomplete history and retains previous statistics. Plugins run unsandboxed under your account; review the source before installing.
+
+## Development
+
+```sh
+python3 tests/check.py
+omarchy plugin validate .
+bash -n bin/omarchy-agent-usage-update
+```
+
+The Python standard-library checks cover percentage conversion, token totals and caching, pagination, errors, and refresh flag routing. No package installation is needed.
+
+The upstream QML and assets were copied from Omarchy 4.0.4's `shell/plugins/agents`, preserving its MIT license. The integration changes only the updater command in `Main.qml`, the plugin manifest, and the bundled collectors/tests. See [CHANGES.md](CHANGES.md) for the implementation and validation record. This clone does not automatically receive future changes to Omarchy's stock QML; update the plugin when a compatible release is available.
+
+## License
+
+MIT. Original widget copyright David Heinemeier Hansson; Cursor integration copyright 2026 Darkosxl. See [LICENSE](LICENSE).
