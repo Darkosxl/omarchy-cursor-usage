@@ -11,8 +11,13 @@
 - Corrected the headline allowance to use included spend / plan limit, matching Cursor's overall usage display; model-pool percentages remain separately labeled. Small nonzero Cursor percentages no longer round to zero.
 - Cursor refreshes both limits and token history every time the existing panel-open refresh runs; other providers retain their stock limits-only behavior.
 
-Runtime records and account credentials are outside the repository. Live screenshots are not committed because they may contain personal desktop content.
+Runtime records and account credentials are outside the repository. `preview.png` is a reviewed capture of the agents panel only.
 
 ## Validation
 
-Automated collector and updater checks and the Omarchy manifest validator pass. Live installation and removal verification is recorded here before release.
+Checked on 2026-10-01 with Omarchy 4.0.4-1.
+
+- `python3 tests/check.py`, `omarchy plugin validate .`, and `bash -n bin/omarchy-agent-usage-update` pass. The checks cover percentage conversion, token totals, pagination, cache and failure handling, and refresh flag routing.
+- After `omarchy-shell omarchy.agents refresh` and opening the panel, Cursor showed Included plan 99%, Auto pool 4%, and API pool 4%. The usage record behind that view was about 0.994, 0.0405, and 0.0369. No meter displayed 0%. Every live value was at least 1%, so the panel used ordinary rounding. Nonzero Cursor values below 1% still format as one decimal, or `<0.1%` when they are below a tenth of a percent, in `Panel.qml`.
+- Opening the panel runs the bundled updater with `--limits-only`. Cursor still fetches limits and token history on that path; the other providers keep their stock limits-only behavior. A manual refresh (`omarchy-shell omarchy.agents refresh`) collects both as well.
+- Removing the plugin restores the stock Omarchy agents widget. Installing from the public repository is recorded below once that check is done.
