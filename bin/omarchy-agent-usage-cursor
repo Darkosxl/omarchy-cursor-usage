@@ -86,7 +86,14 @@ def limits(summary):
     if not isinstance(plan, dict):
         raise UsageError("Cursor did not return supported individual plan limits.")
     result = []
-    for field, title in (("autoPercentUsed", "Auto"), ("apiPercentUsed", "API"), ("totalPercentUsed", "Total")):
+    # Match Cursor's overall included-usage display: spend / plan allowance.
+    # totalPercentUsed is a separate model-pool metric, not this allowance.
+    allowance = number(plan.get("limit", 0))
+    if allowance > 0:
+        result.append({"label": "Monthly included usage", "title": "Included plan",
+                       "percent": number(plan.get("used")) / allowance,
+                       "resetsAt": summary.get("billingCycleEnd", "")})
+    for field, title in (("autoPercentUsed", "Auto pool"), ("apiPercentUsed", "API pool")):
         if field in plan and plan[field] is not None:
             result.append({"label": title, "title": title, "percent": number(plan[field]) / 100,
                            "resetsAt": summary.get("billingCycleEnd", "")})
@@ -153,19 +160,19 @@ def collect(limits_only=False, force=False):
     record.update(schemaVersion=1, id="cursor", name="Cursor", scope="account", hasPromptStats=False)
     record.setdefault("limits", [])
     record.setdefault("ready", False)
-    stats_failed = record.get("usageStatusText") == "Token usage unavailable"
     try:
         cookie = session_cookie()
         summary = request(cookie, "/api/usage-summary")
         record["limits"] = limits(summary)
         record.update(tierLabel=str(summary.get("membershipType") or "Subscription"), ready=True,
                       usageStatusText="", authHelpText="", updatedAt=datetime.now(timezone.utc).isoformat())
-        if force or not limits_only or not record.get("hasLocalStats") or stats_failed:
-            try:
-                now = datetime.now().astimezone()
-                record.update(summarize(events(cookie, now), now.date()))
-            except UsageError as error:
-                record.update(usageStatusText="Token usage unavailable", authHelpText=str(error))
+        # Cursor's dashboard calls are small: even --limits-only (panel open)
+        # fetches fresh token history. Keep the flags for updater compatibility.
+        try:
+            now = datetime.now().astimezone()
+            record.update(summarize(events(cookie, now), now.date()))
+        except UsageError as error:
+            record.update(usageStatusText="Token usage unavailable", authHelpText=str(error))
     except UsageError as error:
         record.update(usageStatusText="Cursor usage unavailable", authHelpText=str(error))
     return record

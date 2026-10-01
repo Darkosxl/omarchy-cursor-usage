@@ -1,6 +1,6 @@
 # Agents + Cursor for Omarchy
 
-Adds **Cursor** alongside **Claude Code** and **Codex** in Omarchy's native agents panel. Shows Cursor's Auto, API and total plan usage, billing-cycle reset, tokens by day, and tokens by model.
+Adds **Cursor** alongside **Claude Code** and **Codex** in Omarchy's native agents panel. Shows Cursor's included-plan usage, Auto/API model pools, billing-cycle reset, tokens by day, and tokens by model.
 
 This is an installable clone of the agents widget shipped with **Omarchy 4.0.4 (Quattro)**, not a separate dashboard. Enabling it replaces the built-in widget in its existing bar position and retains its settings. Claude, Codex and Fireworks continue using Omarchy's installed collectors.
 
@@ -22,7 +22,7 @@ Cursor uses exactly the existing panel refresh lifecycle:
 | --- | --- |
 | Shell starts / widget loads | Collect all enabled providers |
 | Every 900 seconds by default | Refresh limits and token history |
-| Open the panel | `--limits-only`: refresh limits, reuse token statistics |
+| Open the panel | Refresh Cursor limits **and token history**; other providers retain their native `--limits-only` behavior |
 | Press `r` or Enter in the panel | `--force`: refresh limits and token statistics |
 
 The bundled updater forwards all arguments to the installed stock updater and runs the Cursor collector alongside it. It honors `--except cursor`, explicit provider selections, and the panel's enabled-provider settings. There is no additional timer, service, global command override, or packaged Omarchy file modification.
@@ -33,7 +33,7 @@ To change the interval:
 omarchy bar set darkosxl.agents-cursor refreshIntervalSec 900 --json
 ```
 
-Cursor token history covers the past 30 days; the daily chart shows the last seven local calendar days. Values come from account-wide usage, including other devices, and use Omarchy's account-scope aggregation. Cached token data is reused when only limits are requested. A failed request preserves previously collected data and displays an error; a first-ever failure with no usable data may leave the Cursor tab hidden.
+Cursor token history covers the past 30 days; the daily chart shows the last seven local calendar days. Values come from account-wide usage, including other devices, and use Omarchy's account-scope aggregation. Every panel opening fetches fresh Cursor data. Included-plan usage is spend divided by the plan allowance, matching Cursor's overall usage display; the Auto/API percentages describe separate model pools. Nonzero pool usage below 1% displays a decimal or `<0.1%`, never `0%`. A failed request preserves previously collected data and displays an error; a first-ever failure with no usable data may leave the Cursor tab hidden.
 
 ## Update and remove
 
@@ -67,7 +67,7 @@ bash -n bin/omarchy-agent-usage-update
 
 The Python standard-library checks cover percentage conversion, token totals and caching, pagination, errors, and refresh flag routing. No package installation is needed.
 
-The upstream QML and assets were copied from Omarchy 4.0.4's `shell/plugins/agents`, preserving its MIT license. The integration changes only the updater command in `Main.qml`, the plugin manifest, and the bundled collectors/tests. See [CHANGES.md](CHANGES.md) for the implementation and validation record. This clone does not automatically receive future changes to Omarchy's stock QML; update the plugin when a compatible release is available.
+The upstream QML and assets were copied from Omarchy 4.0.4's `shell/plugins/agents`, preserving its MIT license. The integration changes the updater command in `Main.qml`, small-percentage formatting for Cursor in `Panel.qml`, the plugin manifest, and the bundled collectors/tests. See [CHANGES.md](CHANGES.md) for the implementation and validation record. This clone does not automatically receive future changes to Omarchy's stock QML; update the plugin when a compatible release is available.
 
 ## License
 

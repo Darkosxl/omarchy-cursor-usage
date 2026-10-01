@@ -15,9 +15,13 @@ spec = importlib.util.spec_from_loader(loader.name, loader)
 cursor = importlib.util.module_from_spec(spec)
 loader.exec_module(cursor)
 
-summary = {"individualUsage": {"plan": {"autoPercentUsed": 0, "apiPercentUsed": 100, "totalPercentUsed": 125}},
+summary = {"individualUsage": {"plan": {"used": 131, "limit": 2000, "autoPercentUsed": 0.1511, "apiPercentUsed": 1.4, "totalPercentUsed": 0.2646}},
            "billingCycleEnd": "2026-10-13T08:15:23Z", "membershipType": "pro"}
-assert [w["percent"] for w in cursor.limits(summary)] == [0, 1, 1.25]
+values = cursor.limits(summary)
+assert values[0]["title"] == "Included plan" and values[0]["percent"] == 131 / 2000
+assert [w["percent"] for w in values[1:]] == [0.1511 / 100, 1.4 / 100]
+for used in (0, 2000, 2500):
+    assert cursor.limits({"individualUsage": {"plan": {"used": used, "limit": 2000}}})[0]["percent"] == used / 2000
 for bad in (None, {}, {"individualUsage": None}, {"individualUsage": {"plan": []}},
             {"individualUsage": {"plan": {"apiPercentUsed": "nan"}}}):
     try:
@@ -50,9 +54,13 @@ with tempfile.TemporaryDirectory() as tmp:
     cursor.session_cookie = lambda: "test"
     cursor.request = lambda *args: summary
     cursor.CACHE.write_text(json.dumps(dict(stats, id="cursor")))
-    cursor.events = lambda *args: (_ for _ in ()).throw(AssertionError("Limits-only fetched history"))
+    event_calls = []
+    def fresh_events(*args):
+        event_calls.append(True)
+        return [event(now)]
+    cursor.events = fresh_events
     result = cursor.collect(limits_only=True)
-    assert result["ready"] and result["modelUsage"] == stats["modelUsage"]
+    assert result["ready"] and event_calls == [True] and result["todayTotalTokens"] == 35
     cursor.events = lambda *args: []
     assert cursor.collect(limits_only=True, force=True)["modelUsage"] == {}
     cursor.request = lambda *args: (_ for _ in ()).throw(cursor.UsageError("offline"))

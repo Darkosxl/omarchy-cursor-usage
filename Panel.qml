@@ -49,6 +49,13 @@ Panel {
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
   function alpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
 
+  function formatLimitPercent(value) {
+    var percent = value * 100
+    if (provider && provider.providerId === "cursor" && percent > 0 && percent < 1)
+      return percent < 0.1 ? "<0.1%" : percent.toFixed(1) + "%"
+    return Math.round(percent) + "%"
+  }
+
   function selectProvider(index) {
     if (providers.length === 0) return
     var wrapped = ((index % providers.length) + providers.length) % providers.length
@@ -733,7 +740,7 @@ Panel {
         id: limitValue
         textFormat: Text.PlainText
         text: limitRow.window && limitRow.window.percent >= 0
-          ? Math.round(limitRow.window.percent * 100) + "%"
+          ? root.formatLimitPercent(limitRow.window.percent)
           : "—"
         color: limitRow.alarming ? root.urgent : root.foreground
         font.family: root.fontFamily

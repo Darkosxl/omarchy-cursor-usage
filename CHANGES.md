@@ -8,6 +8,8 @@
 - Connected the existing QML refresh command to the bundled updater. The timer, panel-open behavior, manual refresh, rendering, keyboard interactions and stock collectors are unchanged.
 - Declared a root plugin manifest with ID `darkosxl.agents-cursor` and `clonedFrom: omarchy.agents`, preserving native enable/disable restoration behavior.
 - Added executable checks and installation, update, privacy and removal documentation.
+- Corrected the headline allowance to use included spend / plan limit, matching Cursor's overall usage display; model-pool percentages remain separately labeled. Small nonzero Cursor percentages no longer round to zero.
+- Cursor refreshes both limits and token history every time the existing panel-open refresh runs; other providers retain their stock limits-only behavior.
 
 Runtime records and account credentials are outside the repository. Live screenshots are not committed because they may contain personal desktop content.
 
